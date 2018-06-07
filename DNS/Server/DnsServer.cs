@@ -52,11 +52,16 @@ namespace DNS.Server {
             this.resolver = resolver;
         }
 
-        public async Task Listen(int port = DEFAULT_PORT) {
+		public Task Listen(int port = DEFAULT_PORT)
+		{
+			return Listen(IPAddress.Any, port);
+		}
+
+        public async Task Listen(IPAddress address, int port = DEFAULT_PORT) {
             await Task.Yield();
 
             TaskCompletionSource<object> tcs = new TaskCompletionSource<object>();
-            IPEndPoint ip = new IPEndPoint(IPAddress.Any, port);
+            IPEndPoint ip = new IPEndPoint(address, port);
 
             if (run) {
                 try {
@@ -67,27 +72,31 @@ namespace DNS.Server {
                 }
             }
 
-            AsyncCallback receiveCallback = null;
-            receiveCallback = result => {
-                byte[] data;
 
-                try {
-                    data = udp.EndReceive(result, ref ip);
-                    HandleRequest(data, ip);
-                }
-                catch (ObjectDisposedException) {
-                    // run should already be false
-                    run = false;
-                }
-                catch (SocketException e) {
-                    OnErrored(e);
-                }
+			void receiveCallback(IAsyncResult result)
+			{
+				byte[] data;
 
-                if (run) udp.BeginReceive(receiveCallback, null);
-                else tcs.SetResult(null);
-            };
+				try
+				{
+					data = udp.EndReceive(result, ref ip);
+					HandleRequest(data, ip);
+				}
+				catch (ObjectDisposedException)
+				{
+					// run should already be false
+					run = false;
+				}
+				catch (SocketException e)
+				{
+					OnErrored(e);
+				}
 
-            udp.BeginReceive(receiveCallback, null);
+				if (run) udp.BeginReceive(receiveCallback, null);
+				else tcs.SetResult(null);
+			}
+
+			udp.BeginReceive(receiveCallback, null);
             OnListening();
             await tcs.Task;
         }
@@ -96,27 +105,15 @@ namespace DNS.Server {
             Dispose(true);
         }
 
-        protected virtual void OnRequested(IRequest request) {
-            RequestedEventHandler handlers = Requested;
-            if (handlers != null) handlers(request);
-        }
+		protected virtual void OnRequested(IRequest request) => Requested?.Invoke(request);
 
-        protected virtual void OnResponded(IRequest request, IResponse response) {
-            RespondedEventHandler handlers = Responded;
-            if (handlers != null) handlers(request, response);
-        }
+		protected virtual void OnResponded(IRequest request, IResponse response) => Responded?.Invoke(request, response);
 
-        protected virtual void OnListening() {
-            ListeningEventHandler handlers = Listening;
-            if (handlers != null) handlers();
-        }
+		protected virtual void OnListening() => Listening?.Invoke();
 
-        protected virtual void OnErrored(Exception e) {
-            ErroredEventHandler handlers = Errored;
-            if (handlers != null) handlers(e);
-        }
+		protected virtual void OnErrored(Exception e) => Errored?.Invoke(e);
 
-        protected virtual void Dispose(bool disposing) {
+		protected virtual void Dispose(bool disposing) {
             if (!disposed) {
                 disposed = true;
 
@@ -132,6 +129,7 @@ namespace DNS.Server {
 
             try {
                 request = Request.FromArray(data);
+				request.Sender = remote;
                 OnRequested(request);
 
                 IResponse response = await resolver.Resolve(request);

@@ -55,7 +55,9 @@ namespace DNS.Client {
             get { return request.Size; }
         }
 
-        public byte[] ToArray() {
+		public IPEndPoint Sender { get; set; }
+
+		public byte[] ToArray() {
             return request.ToArray();
         }
 

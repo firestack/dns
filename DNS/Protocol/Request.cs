@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using DNS.Protocol.Utils;
 using DNS.Protocol.ResourceRecords;
+using System.Net;
 
 namespace DNS.Protocol {
     public class Request : IRequest {
@@ -87,7 +88,9 @@ namespace DNS.Protocol {
             set { header.RecursionDesired = value; }
         }
 
-        public byte[] ToArray() {
+		public IPEndPoint Sender { get; set; }
+
+		public byte[] ToArray() {
             UpdateHeader();
             ByteStream result = new ByteStream(Size);
 

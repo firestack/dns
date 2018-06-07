@@ -7,5 +7,6 @@ namespace DNS.Protocol {
         IList<IResourceRecord> AdditionalRecords { get; }
         OperationCode OperationCode { get; set; }
         bool RecursionDesired { get; set; }
+		System.Net.IPEndPoint Sender { get; }
     }
 }
